@@ -3,20 +3,27 @@ clc;
 
 import matlab.io.*
 
-ds = fileDatastore('0114\011442793','ReadFcn',@ReadFITFunc)
+ds = fileDatastore('Project\011442793','ReadFcn',@ReadFITFunc)
 ds = transform(ds,@mediands);
+
 data=readall(ds);
 
-% data = cell2underlying(data1);
+
+
 
 figure
-plot(data.TIME, data.SAP_FLUX);
+% plot(data.TIME, data.SAP_FLUX);
 hold all;
-plot(data.TIME,data.PDCSAP_FLUX);
+% plot(data.TIME,data.PDCSAP_FLUX);
 
 
+ds = transform(ds,@process_light_curve);
 
+data=readall(ds);
 
+data = phase_fold_and_sort_light_curve(data);
+
+plot(data.TIME,data.PDCSAP_FLUX,'o');
 
 function tabledData =   ReadFITFunc(filename)
 
@@ -43,6 +50,10 @@ end
 function ds = mediands(ds)
 
 ds.PDCSAP_FLUX = ds.PDCSAP_FLUX / nanmedian(ds.PDCSAP_FLUX);
+% figure
+% plot(ds.TIME,ds.PDCSAP_FLUX);hold all;
+
+% plot(ds.TIME,ds.PDCSAP_FLUX);
 
 end
 
@@ -50,11 +61,24 @@ function file_names=read_light_curve(kepid, keper_data_dir)% Reads light curves 
 
 end
 
-function [time,flux]=process_light_curve(all_time, all_flux) % remove low-frequence variability from a light curves and returns time,flux all_time and all_flux is defined in the function read_light_curve
-
+function ds = process_light_curve(ds) % remove low-frequence variability from a light curves and returns time,flux all_time and all_flux is defined in the function read_light_curve
+%  threshold  = 0.75 ;
+%  boundaries = [true, diff(ds.TIME) > threshold, true,true] ;
+%  time_flux = mat2cell([ds.TIME, ds.PDCSAP_FLUX],[diff(find(boundaries))],2);
+%  Asamplepoints = cellfun(@(x) smoothdata(x(:,2),'movmedian',2,'SamplePoints',x(:,1)),time_flux,'UniformOutput',false);
+ds.TIME = inpaint_nans(ds.TIME);
+ds.PDCSAP_FLUX = ds.PDCSAP_FLUX ./ (smoothdata(ds.PDCSAP_FLUX,'movmedian',2,'omitnan','SamplePoints',ds.TIME));
+ 
 end
 
-function [time, values]=phase_fold_and_sort_light_curve(time, values, period, t0) % Sorts light curve by acending time time found in CSV file Values is the sorted time period is the tce_period, which is the orbital period of the detected event in days can be found in CSV file t0: The center of the resulting folded vector; this value is mapped to 0.
+function data =phase_fold_and_sort_light_curve(data) % Sorts light curve by acending time time found in CSV file Values is the sorted time period is the tce_period, which is the orbital period of the detected event in days can be found in CSV file t0: The center of the resulting folded vector; this value is mapped to 0.
+
+period = 331.603;%%TODO: Need to get this from CSV file per source
+t0 = 140.48;%%TODO: Need to get this from CSV file per source
+hperiod = period/2;
+data.TIME = mod(data.TIME + (hperiod -t0),period);
+data.TIME = data.TIME - hperiod;
+data = sortrows(data,1);
 
 end
 
@@ -70,7 +94,7 @@ function generate_view=local_view(time,values,period,duration,num_bins,bin_width
 
 end
 
-function ex=generate_example_for_tce(time,flux,tce) % Generates a train example representing an input TCE flux is the rturn from process_light_curve, all_flux
+function ex=find_tce(time,flux,tce) % Generates a train example representing an input TCE flux is the rturn from process_light_curve, all_flux
 
 end
 
